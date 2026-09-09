@@ -30,9 +30,10 @@ export function formatDateTime(dateStr: string): string {
   })
 }
 
-export function formatCPF(cpf: string): string {
+export function formatCPF(cpf: string | null | undefined): string {
+  if (!cpf) return '—'
   const digits = String(cpf).replace(/\D/g, '')
-  if (digits.length !== 11) return cpf
+  if (digits.length !== 11) return String(cpf)
   return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
 }
 
@@ -42,6 +43,47 @@ export function maskCPF(value: string): string {
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`
   if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
+/** Remove acentos, pontuação e espaços duplicados; devolve em MAIÚSCULAS. */
+export function normalizarNome(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+/** Partículas que não contam como "nome" na hora de montar o usuário. */
+export const PARTICULAS_NOME = ['DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'D']
+
+/**
+ * Usuário de acesso = primeiro nome + segundo nome, juntos e em minúsculas.
+ * Partículas (de, da, dos...) são puladas: "MARIA DA CONCEICAO SARDINHA"
+ * vira "mariaconceicao". Nomes com uma palavra só devolvem apenas ela.
+ */
+export function gerarUsuario(nome: string): string {
+  const partes = normalizarNome(nome).split(' ').filter(Boolean)
+  const significativas = partes.filter(p => !PARTICULAS_NOME.includes(p))
+  const escolhidas = significativas.length >= 2 ? significativas.slice(0, 2) : partes.slice(0, 2)
+  return escolhidas.join('').toLowerCase()
+}
+
+/** Gera um usuário livre, tentando o nome seguinte antes de recorrer a número. */
+export function gerarUsuarioUnico(nome: string, emUso: Set<string>): string {
+  const base = gerarUsuario(nome)
+  if (base && !emUso.has(base)) return base
+
+  const partes = normalizarNome(nome).split(' ').filter(p => p && !PARTICULAS_NOME.includes(p))
+  for (let i = 2; i < partes.length; i++) {
+    const alt = (partes[0] + partes[i]).toLowerCase()
+    if (!emUso.has(alt)) return alt
+  }
+  let n = 2
+  while (emUso.has(`${base}${n}`)) n++
+  return `${base}${n}`
 }
 
 export function parseExcelHours(value: unknown): number {

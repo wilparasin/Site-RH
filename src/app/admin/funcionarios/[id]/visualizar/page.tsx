@@ -39,7 +39,7 @@ export default async function VisualizarFuncionarioPage({
           <span className="font-medium">Visualizando como:</span>
           <span>{profile.nome}</span>
           <span className="text-amber-500">·</span>
-          <span className="text-amber-600">CPF {formatCPF(profile.cpf)}</span>
+          <span className="text-amber-600">{profile.usuario ?? formatCPF(profile.cpf)}</span>
         </div>
         <Link
           href="/admin/funcionarios"
@@ -67,7 +67,7 @@ export default async function VisualizarFuncionarioPage({
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Olá, {profile.nome.split(' ')[0]}!</h1>
           <p className="text-slate-500 text-sm mt-1">
-            CPF {formatCPF(profile.cpf)}
+            {profile.usuario ? `Usuário ${profile.usuario}` : `CPF ${formatCPF(profile.cpf)}`}
             {profile.cargo && ` · ${profile.cargo}`}
             {profile.departamento && ` · ${profile.departamento}`}
           </p>

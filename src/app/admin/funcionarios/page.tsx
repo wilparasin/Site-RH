@@ -33,10 +33,11 @@ export default async function FuncionariosPage() {
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Nome</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">CPF</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Usuário</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Cargo</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Departamento</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Cadastrado</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Senha</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3"></th>
                 </tr>
@@ -45,10 +46,17 @@ export default async function FuncionariosPage() {
                 {funcionarios.map(f => (
                   <tr key={f.id} className="hover:bg-slate-50 transition">
                     <td className="px-6 py-4 font-medium text-slate-900 break-words">{f.nome}</td>
-                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap">{formatCPF(f.cpf)}</td>
+                    <td className="px-6 py-4 text-slate-600 whitespace-nowrap font-mono text-xs">
+                      {f.usuario ?? formatCPF(f.cpf)}
+                    </td>
                     <td className="px-6 py-4 text-slate-500 hidden md:table-cell">{f.cargo || '—'}</td>
                     <td className="px-6 py-4 text-slate-500 hidden lg:table-cell">{f.departamento || '—'}</td>
                     <td className="px-6 py-4 text-slate-400 hidden lg:table-cell">{formatDate(f.created_at)}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${f.senha_definida === false ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                        {f.senha_definida === false ? 'Aguardando 1º acesso' : 'Definida'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${f.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                         {f.ativo ? 'Ativo' : 'Inativo'}

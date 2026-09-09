@@ -24,9 +24,36 @@ export async function PATCH(
   const profileUpdate: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if ('ativo' in body) profileUpdate.ativo = body.ativo
   if ('nome' in body) profileUpdate.nome = body.nome
-  if ('cpf' in body) profileUpdate.cpf = String(body.cpf).replace(/\D/g, '')
+  if ('cpf' in body) profileUpdate.cpf = String(body.cpf ?? '').replace(/\D/g, '') || null
   if ('cargo' in body) profileUpdate.cargo = body.cargo
   if ('departamento' in body) profileUpdate.departamento = body.departamento
+  if ('empresa' in body) profileUpdate.empresa = body.empresa
+  if ('codigoFolha' in body) profileUpdate.codigo_folha = body.codigoFolha
+
+  if ('usuario' in body) {
+    const usuario = String(body.usuario ?? '').trim().toLowerCase() || null
+    if (usuario) {
+      const { data: existente } = await admin
+        .from('profiles')
+        .select('id')
+        .eq('usuario', usuario)
+        .neq('id', id)
+        .maybeSingle()
+      if (existente) {
+        return NextResponse.json({ error: `O usuário "${usuario}" já está em uso.` }, { status: 409 })
+      }
+    }
+    profileUpdate.usuario = usuario
+  }
+
+  // Redefinir senha: a conta volta a exigir a criação de senha no próximo acesso
+  if (body.redefinirSenha) {
+    const { error: resetError } = await admin.auth.admin.updateUserById(id, {
+      password: crypto.randomUUID(),
+    })
+    if (resetError) return NextResponse.json({ error: resetError.message }, { status: 500 })
+    profileUpdate.senha_definida = false
+  }
 
   const { error: profileError } = await admin.from('profiles').update(profileUpdate).eq('id', id)
   if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
@@ -35,6 +62,7 @@ export async function PATCH(
   if (body.senha) {
     const { error: senhaError } = await admin.auth.admin.updateUserById(id, { password: body.senha })
     if (senhaError) return NextResponse.json({ error: senhaError.message }, { status: 500 })
+    await admin.from('profiles').update({ senha_definida: true }).eq('id', id)
   }
 
   return NextResponse.json({ ok: true })

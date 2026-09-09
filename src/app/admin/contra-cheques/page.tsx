@@ -8,7 +8,7 @@ export default async function ContraChequesAdminPage() {
     { data: funcionarios },
     { data: contraCheques },
   ] = await Promise.all([
-    supabase.from('profiles').select('id, nome, cpf').eq('role', 'employee').eq('ativo', true).order('nome'),
+    supabase.from('profiles').select('id, nome, cpf, usuario').eq('role', 'employee').eq('ativo', true).order('nome'),
     supabase.from('contra_cheques').select('*').order('created_at', { ascending: false }).limit(200),
   ])
 

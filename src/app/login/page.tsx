@@ -3,26 +3,26 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { CheckCircle, Eye, EyeOff, KeyRound } from 'lucide-react'
 
-type Modo = 'login' | 'trocar-senha'
+type Modo = 'login' | 'primeiro-acesso' | 'trocar-senha'
 
-function isCPF(value: string): boolean {
-  return value.replace(/\D/g, '').length === 11
+interface Identificacao {
+  email: string | null
+  senhaDefinida: boolean
+  nome?: string
+  erro: string | null
 }
 
-async function resolveIdentifier(identifier: string): Promise<{ email: string | null; erro: string | null }> {
-  if (isCPF(identifier)) {
-    const res = await fetch('/api/auth/resolve-cpf', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cpf: identifier.replace(/\D/g, '') }),
-    })
-    if (!res.ok) return { email: null, erro: 'CPF não encontrado.' }
-    const data = await res.json()
-    return { email: data.email, erro: null }
-  }
-  return { email: identifier, erro: null }
+async function resolveIdentifier(identifier: string): Promise<Identificacao> {
+  const res = await fetch('/api/auth/resolve-identificador', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identificador: identifier.trim() }),
+  })
+  if (!res.ok) return { email: null, senhaDefinida: false, erro: 'Usuário não encontrado.' }
+  const data = await res.json()
+  return { email: data.email, senhaDefinida: data.senhaDefinida, nome: data.nome, erro: null }
 }
 
 function PasswordInput({ value, onChange, placeholder, autoComplete }: {
@@ -66,6 +66,14 @@ export default function LoginPage() {
   const [erroLogin, setErroLogin] = useState('')
   const [carregandoLogin, setCarregandoLogin] = useState(false)
 
+  // Primeiro acesso
+  const [paIdentifier, setPaIdentifier] = useState('')
+  const [paNome, setPaNome] = useState('')
+  const [paSenha, setPaSenha] = useState('')
+  const [paConfirmar, setPaConfirmar] = useState('')
+  const [erroPa, setErroPa] = useState('')
+  const [carregandoPa, setCarregandoPa] = useState(false)
+
   // Trocar senha
   const [tcIdentifier, setTcIdentifier] = useState('')
   const [tcSenhaAtual, setTcSenhaAtual] = useState('')
@@ -80,9 +88,21 @@ export default function LoginPage() {
     setErroLogin('')
     setCarregandoLogin(true)
 
-    const { email, erro } = await resolveIdentifier(identifier)
+    const { email, senhaDefinida, nome, erro } = await resolveIdentifier(identifier)
     if (!email) {
-      setErroLogin(erro || 'Identificador inválido.')
+      setErroLogin(erro || 'Usuário inválido.')
+      setCarregandoLogin(false)
+      return
+    }
+
+    // Ainda não criou a senha: leva direto para o primeiro acesso
+    if (!senhaDefinida) {
+      setPaIdentifier(identifier.trim())
+      setPaNome(nome ?? '')
+      setPaSenha('')
+      setPaConfirmar('')
+      setErroPa('')
+      setModo('primeiro-acesso')
       setCarregandoLogin(false)
       return
     }
@@ -90,10 +110,52 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
     if (error) {
-      setErroLogin('E-mail/CPF ou senha incorretos.')
+      setErroLogin('Usuário ou senha incorretos.')
       setCarregandoLogin(false)
       return
     }
+    router.push('/')
+    router.refresh()
+  }
+
+  async function handlePrimeiroAcesso(e: React.FormEvent) {
+    e.preventDefault()
+    setErroPa('')
+
+    if (paSenha.length < 6) {
+      setErroPa('A senha deve ter no mínimo 6 caracteres.')
+      return
+    }
+    if (paSenha !== paConfirmar) {
+      setErroPa('A senha e a confirmação não coincidem.')
+      return
+    }
+
+    setCarregandoPa(true)
+
+    const res = await fetch('/api/auth/primeiro-acesso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: paIdentifier, senha: paSenha }),
+    })
+    const data = await res.json()
+
+    if (!res.ok) {
+      setErroPa(data.error || 'Não foi possível criar a senha.')
+      setCarregandoPa(false)
+      return
+    }
+
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({ email: data.email, password: paSenha })
+    setCarregandoPa(false)
+
+    if (error) {
+      setErroPa('Senha criada, mas houve um erro ao entrar. Faça login normalmente.')
+      setModo('login')
+      return
+    }
+
     router.push('/')
     router.refresh()
   }
@@ -119,7 +181,7 @@ export default function LoginPage() {
 
     const { email, erro } = await resolveIdentifier(tcIdentifier)
     if (!email) {
-      setErroTc(erro || 'Identificador inválido.')
+      setErroTc(erro || 'Usuário inválido.')
       setCarregandoTc(false)
       return
     }
@@ -132,7 +194,7 @@ export default function LoginPage() {
     })
 
     if (loginError) {
-      setErroTc('E-mail/CPF ou senha atual incorretos.')
+      setErroTc('Usuário ou senha atual incorretos.')
       setCarregandoTc(false)
       return
     }
@@ -152,12 +214,22 @@ export default function LoginPage() {
   function voltarLogin() {
     setModo('login')
     setErroTc('')
+    setErroPa('')
     setTrocaConcluida(false)
     setTcIdentifier('')
     setTcSenhaAtual('')
     setTcNovaSenha('')
     setTcConfirmar('')
+    setPaSenha('')
+    setPaConfirmar('')
   }
+
+  const subtitulo =
+    modo === 'login'
+      ? 'Contra cheques & Banco de Horas'
+      : modo === 'primeiro-acesso'
+        ? 'Primeiro acesso'
+        : 'Trocar senha'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 px-4">
@@ -169,9 +241,7 @@ export default function LoginPage() {
             <img src="/logo.png" alt="Logo 2B" style={{ height: '90px', objectFit: 'contain' }} />
             <div className="text-center">
               <h1 className="text-white text-xl font-bold">Portal RH</h1>
-              <p className="text-slate-400 text-sm mt-1">
-                {modo === 'login' ? 'Contra cheques & Banco de Horas' : 'Trocar senha'}
-              </p>
+              <p className="text-slate-400 text-sm mt-1">{subtitulo}</p>
             </div>
           </div>
 
@@ -182,7 +252,7 @@ export default function LoginPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Usuário</label>
                 <input
                   type="text" value={identifier} onChange={e => setIdentifier(e.target.value)}
-                  required autoComplete="username" placeholder="E-mail ou CPF"
+                  required autoComplete="username" placeholder="primeiro e segundo nome (ex: anaclara)"
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
                 />
               </div>
@@ -210,13 +280,84 @@ export default function LoginPage() {
                 {carregandoLogin ? 'Entrando...' : 'Entrar'}
               </button>
 
-              <div className="text-center">
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => { setModo('primeiro-acesso'); setPaIdentifier(identifier); setPaNome('') }}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline transition"
+                >
+                  Primeiro acesso
+                </button>
+                <span className="text-slate-300 text-xs">|</span>
                 <button
                   type="button"
                   onClick={() => { setModo('trocar-senha'); setTcIdentifier(identifier) }}
                   className="text-xs text-slate-500 hover:text-slate-800 underline transition"
                 >
                   Trocar senha
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── PRIMEIRO ACESSO ── */}
+          {modo === 'primeiro-acesso' && (
+            <form onSubmit={handlePrimeiroAcesso} className="px-8 py-8 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex gap-3">
+                <KeyRound className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {paNome ? <><strong className="font-medium text-slate-800">{paNome}</strong>, crie</> : 'Crie'} a sua
+                  senha de acesso. Ela é pessoal — nem o RH consegue vê-la.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Usuário</label>
+                <input
+                  type="text" value={paIdentifier} onChange={e => setPaIdentifier(e.target.value)}
+                  required autoComplete="username" placeholder="primeiro e segundo nome (ex: anaclara)"
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Criar senha</label>
+                <PasswordInput
+                  value={paSenha}
+                  onChange={e => setPaSenha(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Confirmar senha</label>
+                <PasswordInput
+                  value={paConfirmar}
+                  onChange={e => setPaConfirmar(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {erroPa && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+                  {erroPa}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button" onClick={voltarLogin}
+                  className="flex-1 border border-slate-300 text-slate-700 text-sm py-2.5 rounded-lg hover:bg-slate-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit" disabled={carregandoPa}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-400 text-white text-sm font-medium py-2.5 rounded-lg transition"
+                >
+                  {carregandoPa ? 'Criando...' : 'Criar senha e entrar'}
                 </button>
               </div>
             </form>
@@ -229,7 +370,7 @@ export default function LoginPage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Usuário</label>
                 <input
                   type="text" value={tcIdentifier} onChange={e => setTcIdentifier(e.target.value)}
-                  required placeholder="E-mail ou CPF"
+                  required placeholder="primeiro e segundo nome (ex: anaclara)"
                   className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition"
                 />
               </div>

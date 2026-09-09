@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { MoreVertical, PowerOff, Power, Pencil, Trash2, X, Eye } from 'lucide-react'
+import { MoreVertical, PowerOff, Power, Pencil, Trash2, X, Eye, KeyRound } from 'lucide-react'
 import type { Profile } from '@/lib/types'
-import { maskCPF, formatCPF } from '@/lib/utils'
+import { gerarUsuario } from '@/lib/utils'
 
 interface Props {
   funcionario: Profile
@@ -17,9 +17,10 @@ export default function FuncionarioActions({ funcionario }: Props) {
   const [editando, setEditando] = useState(false)
   const [excluindo, setExcluindo] = useState(false)
   const [carregando, setCarregando] = useState(false)
+  const [redefinindo, setRedefinindo] = useState(false)
   const [form, setForm] = useState({
     nome: funcionario.nome,
-    cpf: formatCPF(funcionario.cpf),
+    usuario: funcionario.usuario || gerarUsuario(funcionario.nome),
     cargo: funcionario.cargo || '',
     departamento: funcionario.departamento || '',
     senha: '',
@@ -57,7 +58,7 @@ export default function FuncionarioActions({ funcionario }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nome: form.nome,
-        cpf: form.cpf,
+        usuario: form.usuario,
         cargo: form.cargo || null,
         departamento: form.departamento || null,
         ...(form.senha ? { senha: form.senha } : {}),
@@ -70,6 +71,22 @@ export default function FuncionarioActions({ funcionario }: Props) {
       return
     }
     setEditando(false)
+    router.refresh()
+    setCarregando(false)
+  }
+
+  async function handleRedefinirSenha() {
+    setCarregando(true)
+    const res = await fetch(`/api/admin/funcionarios/${funcionario.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redefinirSenha: true }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      alert(data.error || 'Erro ao redefinir a senha.')
+    }
+    setRedefinindo(false)
     router.refresh()
     setCarregando(false)
   }
@@ -127,6 +144,12 @@ export default function FuncionarioActions({ funcionario }: Props) {
                   ? <><PowerOff className="w-4 h-4 text-amber-500" /> Desativar</>
                   : <><Power className="w-4 h-4 text-emerald-500" /> Reativar</>}
               </button>
+              <button
+                onClick={() => { setMenuPos(null); setRedefinindo(true) }}
+                className="flex items-center gap-2 w-full px-4 py-2 text-sm text-left hover:bg-slate-50 transition"
+              >
+                <KeyRound className="w-4 h-4 text-slate-500" /> Redefinir senha
+              </button>
               <div className="my-1 border-t border-slate-100" />
               <button
                 onClick={() => { setMenuPos(null); setExcluindo(true) }}
@@ -157,9 +180,9 @@ export default function FuncionarioActions({ funcionario }: Props) {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
                 </div>
                 <div>
-                  <div className="flex justify-end mb-1"><label className="text-xs font-medium text-slate-700">CPF *</label></div>
-                  <input value={form.cpf} onChange={e => set('cpf', maskCPF(e.target.value))} required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                  <div className="flex justify-end mb-1"><label className="text-xs font-medium text-slate-700">Usuário *</label></div>
+                  <input value={form.usuario} onChange={e => set('usuario', e.target.value.toLowerCase().replace(/\s/g, ''))} required
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400" />
                 </div>
                 <div>
                   <div className="flex justify-end mb-1"><label className="text-xs font-medium text-slate-700">Nova senha</label></div>
@@ -190,6 +213,37 @@ export default function FuncionarioActions({ funcionario }: Props) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Redefinir Senha */}
+      {redefinindo && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <KeyRound className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900">Redefinir senha</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Use quando o funcionário esquecer a senha.</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              A senha atual de <strong>{funcionario.nome}</strong> será apagada. No próximo login, com o usuário{' '}
+              <span className="font-mono text-slate-800">{funcionario.usuario ?? ''}</span>, ele mesmo cria uma nova senha.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setRedefinindo(false)}
+                className="flex-1 border border-slate-300 text-slate-700 text-sm py-2 rounded-lg hover:bg-slate-50 transition">
+                Cancelar
+              </button>
+              <button onClick={handleRedefinirSenha} disabled={carregando}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 text-white text-sm py-2 rounded-lg transition">
+                {carregando ? 'Redefinindo...' : 'Redefinir'}
+              </button>
+            </div>
           </div>
         </div>
       )}

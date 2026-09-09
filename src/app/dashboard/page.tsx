@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Olá, {profile.nome.split(' ')[0]}!</h1>
           <p className="text-slate-500 text-sm mt-1">
-            CPF {formatCPF(profile.cpf)}
+            {profile.usuario ? `Usuário ${profile.usuario}` : `CPF ${formatCPF(profile.cpf)}`}
             {profile.cargo && ` · ${profile.cargo}`}
             {profile.departamento && ` · ${profile.departamento}`}
           </p>

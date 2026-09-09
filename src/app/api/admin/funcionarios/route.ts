@@ -1,4 +1,5 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { criarFuncionario, gerarUsuarioDisponivel } from '@/lib/funcionarios-server'
 import { NextResponse } from 'next/server'
 
 async function assertAdmin() {
@@ -27,49 +28,63 @@ export async function GET() {
   return NextResponse.json(data)
 }
 
+/**
+ * Cria o acesso de um funcionário. Só o nome é obrigatório: o usuário é
+ * derivado do nome e a senha é criada pelo próprio funcionário no primeiro
+ * acesso (a menos que uma senha inicial seja informada).
+ */
 export async function POST(req: Request) {
   const user = await assertAdmin()
   if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
   const body = await req.json()
-  const nome = body.nome
-  const email = body.email
-  const cpf = String(body.cpf ?? '').replace(/\D/g, '')
-  const cargo = body.cargo
-  const departamento = body.departamento
-  const senha = body.senha
+  const nome = String(body.nome ?? '').trim()
 
-  if (!nome || !email || !cpf || !senha) {
-    return NextResponse.json({ error: 'Campos obrigatórios: nome, email, matrícula, senha' }, { status: 400 })
-  }
+  if (!nome) return NextResponse.json({ error: 'O nome é obrigatório' }, { status: 400 })
 
   const admin = createAdminClient()
 
-  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    email,
-    password: senha,
-    email_confirm: true,
-    user_metadata: { nome, cpf, role: 'employee', cargo: cargo || null, departamento: departamento || null }
-  })
-
-  if (authError || !authUser.user) {
-    return NextResponse.json({ error: authError?.message || 'Erro ao criar usuário' }, { status: 400 })
+  // Só valida colisão quando o admin digitou o usuário manualmente
+  const usuarioInformado = String(body.usuario ?? '').trim().toLowerCase()
+  if (usuarioInformado) {
+    const { data: existente } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('usuario', usuarioInformado)
+      .maybeSingle()
+    if (existente) {
+      return NextResponse.json({ error: `O usuário "${usuarioInformado}" já está em uso.` }, { status: 409 })
+    }
   }
 
-  const { error: profileError } = await admin.from('profiles').upsert({
-    id: authUser.user.id,
+  const resultado = await criarFuncionario(admin, {
     nome,
-    cpf,
-    cargo: cargo || null,
-    departamento: departamento || null,
-    role: 'employee',
-    ativo: true,
+    usuario: usuarioInformado || undefined,
+    cargo: body.cargo || null,
+    departamento: body.departamento || null,
+    empresa: body.empresa || null,
+    codigoFolha: body.codigoFolha || null,
+    cpf: body.cpf || null,
+    email: body.email || null,
+    senha: body.senha || null,
   })
 
-  if (profileError) {
-    await admin.auth.admin.deleteUser(authUser.user.id)
-    return NextResponse.json({ error: profileError.message }, { status: 500 })
+  if (!resultado.ok) {
+    return NextResponse.json({ error: resultado.erro }, { status: 400 })
   }
 
-  return NextResponse.json({ id: authUser.user.id }, { status: 201 })
+  return NextResponse.json(resultado.funcionario, { status: 201 })
+}
+
+/** Sugere um usuário livre a partir do nome (usado pelo formulário). */
+export async function PUT(req: Request) {
+  const user = await assertAdmin()
+  if (!user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+
+  const { nome } = await req.json()
+  if (!nome) return NextResponse.json({ usuario: '' })
+
+  const admin = createAdminClient()
+  const usuario = await gerarUsuarioDisponivel(admin, String(nome))
+  return NextResponse.json({ usuario })
 }

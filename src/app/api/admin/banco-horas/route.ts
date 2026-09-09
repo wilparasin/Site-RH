@@ -1,7 +1,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { read as xlsxRead, utils as xlsxUtils } from 'xlsx'
-import { parseExcelHours } from '@/lib/utils'
+import { parseExcelHours, normalizarNome } from '@/lib/utils'
 
 async function assertAdmin() {
   const supabase = await createClient()
@@ -54,13 +54,19 @@ export async function POST(req: Request) {
   const admin = createAdminClient()
   const { data: funcionarios } = await admin
     .from('profiles')
-    .select('id, nome, cpf')
+    .select('id, nome, cpf, usuario')
     .eq('role', 'employee')
     .eq('ativo', true)
 
   const normalizeCPF = (m: string) => String(m).trim().replace(/^0+/, '').toLowerCase()
 
-  const funcMap = new Map((funcionarios || []).map(f => [normalizeCPF(f.cpf), f]))
+  // A planilha pode trazer CPF, matrícula, usuário ou o nome do funcionário
+  const funcMap = new Map<string, { id: string; nome: string }>()
+  for (const f of funcionarios || []) {
+    if (f.cpf) funcMap.set(normalizeCPF(f.cpf), f)
+    if (f.usuario) funcMap.set(String(f.usuario).toLowerCase(), f)
+  }
+  const funcPorNome = new Map((funcionarios || []).map(f => [normalizarNome(f.nome), f]))
 
   const previewRows = rows.map(row => {
     // Aceita colunas "CPF", "Matricula" ou "Mat" na planilha
@@ -68,7 +74,10 @@ export async function POST(req: Request) {
     const nome = getField(row, 'nome', 'name', 'funcionario').trim()
     const saldo = getField(row, 'saldo', 'horas', 'banco', 'banco de horas', 'saldo horas')
     const saldo_minutos = parseExcelHours(saldo)
-    const func = funcMap.get(normalizeCPF(cpf))
+    const func =
+      funcMap.get(normalizeCPF(cpf)) ??
+      funcMap.get(cpf.toLowerCase()) ??
+      (nome ? funcPorNome.get(normalizarNome(nome)) : undefined)
     return {
       cpf,
       nome: func?.nome || nome,
@@ -87,7 +96,7 @@ export async function POST(req: Request) {
 
   const toInsert = previewRows.filter(r => r.encontrado)
   if (toInsert.length === 0) {
-    return NextResponse.json({ error: 'Nenhum CPF encontrado no sistema' }, { status: 400 })
+    return NextResponse.json({ error: 'Nenhum funcionário da planilha foi encontrado no sistema' }, { status: 400 })
   }
 
   const batchId = crypto.randomUUID()

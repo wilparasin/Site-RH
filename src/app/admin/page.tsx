@@ -17,7 +17,7 @@ export default async function AdminHomePage() {
     supabase.from('contra_cheques').select('*', { count: 'exact', head: true }),
     supabase.from('contra_cheques').select('*').order('created_at', { ascending: false }).limit(5),
     supabase.from('banco_horas_uploads').select('*').order('created_at', { ascending: false }).limit(3),
-    supabase.from('profiles').select('id, nome, cpf').eq('role', 'employee'),
+    supabase.from('profiles').select('id, nome, cpf, usuario').eq('role', 'employee'),
   ])
 
   const funcMap = new Map((todosFuncionarios ?? []).map(f => [f.id, f]))
@@ -90,7 +90,7 @@ export default async function AdminHomePage() {
                 <div key={cc.id} className="px-6 py-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-slate-900">{func?.nome ?? '—'}</p>
-                    <p className="text-xs text-slate-400">CPF {func ? formatCPF(func.cpf) : '—'} · {String(cc.mes).padStart(2,'0')}/{cc.ano}</p>
+                    <p className="text-xs text-slate-400">{func?.usuario ?? formatCPF(func?.cpf)} · {String(cc.mes).padStart(2,'0')}/{cc.ano}</p>
                   </div>
                   <p className="text-xs text-slate-400">{formatDate(cc.created_at)}</p>
                 </div>

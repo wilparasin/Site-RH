@@ -2,20 +2,33 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserPlus, X } from 'lucide-react'
-import { maskCPF } from '@/lib/utils'
+import { UserPlus, X, KeyRound } from 'lucide-react'
+import { gerarUsuario } from '@/lib/utils'
 
 export default function NovoFuncionarioModal() {
   const router = useRouter()
   const [aberto, setAberto] = useState(false)
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState('')
+  const [usuarioEditado, setUsuarioEditado] = useState(false)
   const [form, setForm] = useState({
-    nome: '', email: '', cpf: '', cargo: '', departamento: '', senha: ''
+    nome: '', usuario: '', cargo: '', departamento: '', empresa: ''
   })
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  /** O usuário acompanha o nome até o admin editá-lo à mão. */
+  function setNome(value: string) {
+    setForm(f => ({ ...f, nome: value, usuario: usuarioEditado ? f.usuario : gerarUsuario(value) }))
+  }
+
+  function fechar() {
+    setAberto(false)
+    setErro('')
+    setUsuarioEditado(false)
+    setForm({ nome: '', usuario: '', cargo: '', departamento: '', empresa: '' })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -36,8 +49,8 @@ export default function NovoFuncionarioModal() {
       return
     }
 
-    setAberto(false)
-    setForm({ nome: '', email: '', cpf: '', cargo: '', departamento: '', senha: '' })
+    setCarregando(false)
+    fechar()
     router.refresh()
   }
 
@@ -56,7 +69,7 @@ export default function NovoFuncionarioModal() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
               <h2 className="font-semibold text-slate-900">Novo Funcionário</h2>
-              <button onClick={() => setAberto(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={fechar} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -65,23 +78,17 @@ export default function NovoFuncionarioModal() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-slate-700 mb-1">Nome completo *</label>
-                  <input value={form.nome} onChange={e => set('nome', e.target.value)} required
+                  <input value={form.nome} onChange={e => setNome(e.target.value)} required
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-700 mb-1">E-mail *</label>
-                  <input type="email" value={form.email} onChange={e => set('email', e.target.value)} required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">CPF *</label>
-                  <input value={form.cpf} onChange={e => set('cpf', maskCPF(e.target.value))} required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Senha inicial *</label>
-                  <input type="password" value={form.senha} onChange={e => set('senha', e.target.value)} required minLength={6}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Usuário de acesso *</label>
+                  <input
+                    value={form.usuario}
+                    onChange={e => { setUsuarioEditado(true); set('usuario', e.target.value.toLowerCase().replace(/\s/g, '')) }}
+                    required
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400" />
+                  <p className="text-xs text-slate-400 mt-1">Primeiro e segundo nome, juntos e em minúsculas.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Cargo</label>
@@ -95,10 +102,17 @@ export default function NovoFuncionarioModal() {
                 </div>
               </div>
 
+              <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex gap-3">
+                <KeyRound className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  A senha é criada pelo próprio funcionário no primeiro acesso — basta informar o usuário na tela de login.
+                </p>
+              </div>
+
               {erro && <p className="text-red-600 text-xs">{erro}</p>}
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setAberto(false)}
+                <button type="button" onClick={fechar}
                   className="flex-1 border border-slate-300 text-slate-700 text-sm py-2 rounded-lg hover:bg-slate-50 transition">
                   Cancelar
                 </button>

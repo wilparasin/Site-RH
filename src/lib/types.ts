@@ -3,9 +3,17 @@ export type UserRole = 'employee' | 'admin'
 export interface Profile {
   id: string
   nome: string
-  cpf: string
+  /** Login do funcionário: primeiro + segundo nome, em minúsculas. */
+  usuario: string | null
+  cpf: string | null
   cargo: string | null
   departamento: string | null
+  /** Razão social da empresa que emite a folha. */
+  empresa: string | null
+  /** Código do funcionário na folha de pagamento, usado para casar os PDFs. */
+  codigo_folha: string | null
+  /** Falso enquanto o funcionário não criou a senha no primeiro acesso. */
+  senha_definida: boolean
   role: UserRole
   ativo: boolean
   email?: string
@@ -22,7 +30,7 @@ export interface ContraCheque {
   nome_arquivo: string
   uploaded_by: string
   created_at: string
-  funcionario?: Pick<Profile, 'id' | 'nome' | 'cpf'>
+  funcionario?: Pick<Profile, 'id' | 'nome' | 'cpf' | 'usuario'>
 }
 
 export interface BancoHoras {
