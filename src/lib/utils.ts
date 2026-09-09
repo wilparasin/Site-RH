@@ -18,6 +18,14 @@ export function formatHoras(minutos: number): string {
   return `${sinal}${h}h${m.toString().padStart(2, '0')}min`
 }
 
+/** Mesma coisa, no formato curto das planilhas: "+2:30", "-1:15". */
+export function formatHorasCurto(minutos: number | null | undefined): string {
+  if (minutos === null || minutos === undefined) return '—'
+  const sinal = minutos < 0 ? '-' : '+'
+  const abs = Math.abs(minutos)
+  return `${sinal}${Math.floor(abs / 60)}:${(abs % 60).toString().padStart(2, '0')}`
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric'
@@ -84,18 +92,4 @@ export function gerarUsuarioUnico(nome: string, emUso: Set<string>): string {
   let n = 2
   while (emUso.has(`${base}${n}`)) n++
   return `${base}${n}`
-}
-
-export function parseExcelHours(value: unknown): number {
-  if (typeof value === 'number') return Math.round(value * 60)
-  if (typeof value === 'string') {
-    const match = value.match(/^(-?)(\d+):(\d+)$/)
-    if (match) {
-      const sign = match[1] === '-' ? -1 : 1
-      return sign * (parseInt(match[2]) * 60 + parseInt(match[3]))
-    }
-    const num = parseFloat(value.replace(',', '.'))
-    if (!isNaN(num)) return Math.round(num * 60)
-  }
-  return 0
 }

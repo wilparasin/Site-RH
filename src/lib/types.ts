@@ -36,9 +36,18 @@ export interface ContraCheque {
 export interface BancoHoras {
   id: string
   funcionario_id: string
+  /** Total do período: acumulado + saldo do mês, em minutos. */
   saldo_minutos: number
+  /** Saldo que vinha dos meses anteriores. */
+  acumulado_minutos: number | null
+  /** Saldo do próprio mês. */
+  mes_minutos: number | null
   periodo: string
+  mes: number | null
+  ano: number | null
   observacao: string | null
+  /** Nome como veio escrito na planilha. */
+  nome_planilha: string | null
   upload_batch_id: string
   created_at: string
 }
