@@ -39,8 +39,30 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Uma sessão antiga (token de renovação expirado ou revogado) faz o
+  // getUser lançar erro. Nesse caso tratamos como "não logado" e limpamos os
+  // cookies do Supabase — sem isso, toda requisição repete o erro.
+  let user = null
+  let sessaoInvalida = false
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (error && error.status !== 401 && error.name !== 'AuthSessionMissingError') {
+      sessaoInvalida = true
+    }
+    user = data.user
+  } catch {
+    sessaoInvalida = true
+  }
+
   const path = request.nextUrl.pathname
+
+  if (sessaoInvalida) {
+    const destino = path === '/login' ? supabaseResponse : NextResponse.redirect(new URL('/login', request.url))
+    for (const cookie of request.cookies.getAll()) {
+      if (cookie.name.startsWith('sb-')) destino.cookies.delete(cookie.name)
+    }
+    return destino
+  }
 
   const isPublic = path === '/login' || path === '/nova-senha' || path.startsWith('/api/auth')
 

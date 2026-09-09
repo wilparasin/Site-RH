@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# O .next fica fora do iCloud (pastas .nosync não sincronizam);
+# como .next vira um link, precisa ser ignorado sem a barra final
+.next
+.next.nosync
