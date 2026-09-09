@@ -30,6 +30,29 @@ casar entregaria o contra cheque ao colega. Quando o nome não bate com nenhum c
 bate com mais de um — nada é enviado automaticamente: a linha fica na tela para o admin
 escolher o funcionário ou criar o acesso.
 
+## Banco de horas
+
+A tela **Banco de Horas** recebe a planilha do mês como o RH já a monta (uma por loja —
+`SOLUÇÃO H.E. MATRIZ`, `FILIAL`...): o mês na primeira linha e, na segunda, o cabeçalho
+`FUNCIONÁRIO | ACUMULADO | <mês> | TOTAL | MOTIVO`.
+
+- **Identificação só pelo nome.** A planilha traz o primeiro nome (`ALBERTO`), com o
+  sobrenome aparecendo quando ele é preciso para desempatar (`RAFAELA BOTTARO`). As linhas
+  mais específicas são resolvidas primeiro e a pessoa escolhida sai da disputa: `RAFAELA
+  BOTTARO` fica com Rafaela Sofia Bottaro e `RAFAELA`, sozinha, sobra para Rafaela Soares.
+  O que continua em dúvida — nome que não existe no cadastro, ou duas pessoas possíveis —
+  volta na tela de conferência para o admin escolher. Nada é gravado por adivinhação.
+- **Os três números** são guardados: o saldo `acumulado` dos meses anteriores, o saldo do
+  próprio `mês` e o `total`. As horas vêm como hora do Excel (inclusive negativas, `-0:22`),
+  no formato `H:MM` ou em horas decimais.
+- **O período** é lido da própria planilha (`JULHO 2026`); o campo na tela só serve para
+  corrigir.
+- **Reimportar o mesmo mês** substitui os saldos daquele mês, em vez de empilhar linhas
+  repetidas no histórico.
+
+Cada funcionário vê apenas o próprio saldo, com o acumulado, o mês e o total, mais o
+histórico dos meses anteriores.
+
 ## Banco de dados
 
 Ao subir o projeto pela primeira vez, execute no SQL Editor do Supabase, nesta ordem:
@@ -37,6 +60,9 @@ Ao subir o projeto pela primeira vez, execute no SQL Editor do Supabase, nesta o
 1. `supabase-schema.sql` — tabelas, RLS e o bucket `contra-cheques`.
 2. `supabase-migracao-acesso-usuario.sql` — colunas de acesso por usuário
    (`usuario`, `senha_definida`, `codigo_folha`, `empresa`).
+3. `supabase-migracao-banco-horas.sql` — colunas do saldo por mês
+   (`acumulado_minutos`, `mes_minutos`, `mes`, `ano`) e um registro por
+   funcionário/período. **Sem ela a importação do banco de horas não grava.**
 
 ## Getting Started
 
